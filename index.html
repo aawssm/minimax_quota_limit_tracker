@@ -366,6 +366,14 @@
       transition: width 0.4s ease-out;
     }
 
+    .weekly-stats {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 6px;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
     /* Footer */
     .footer {
       text-align: center;
@@ -883,6 +891,24 @@
         const weekUsed = Math.max(0, weekLimit - weekRemaining);
         const weekPercent = weekLimit > 0 ? (weekUsed / weekLimit) * 100 : 0;
 
+        // Weekly time calculations (secondary expiry)
+        const weekResetIn = m.weekly_remains_time ? formatDuration(m.weekly_remains_time) : null;
+        const weekDaysLeft = m.weekly_remains_time ? (m.weekly_remains_time / 86400000).toFixed(1) : null;
+
+        // Weekly rate calculations
+        let weekElapsedMs = 0;
+        let weekTotalMs = 0;
+        if (m.weekly_end_time && m.weekly_start_time) {
+          weekTotalMs = m.weekly_end_time - m.weekly_start_time;
+          weekElapsedMs = weekTotalMs - (m.weekly_remains_time || 0);
+        }
+        const weekRateOfUse = weekElapsedMs > 0 ? (weekPercent / (weekElapsedMs / 3600000)) : 0;
+        const weekMaxRateOfUse = m.weekly_remains_time > 0 ? ((100 - weekPercent) / (m.weekly_remains_time / 3600000)) : 0;
+
+        // Absolute weekly rate (requests per hour)
+        const weekRateOfUseAbs = weekElapsedMs > 0 ? (weekUsed / (weekElapsedMs / 3600000)) : 0;
+        const weekMaxRateOfUseAbs = m.weekly_remains_time > 0 ? (weekRemaining / (m.weekly_remains_time / 3600000)) : 0;
+
         const resetIn = formatDuration(m.remains_time);
 
         // Calculate interval duration from API times
@@ -953,11 +979,15 @@
 
             <div class="weekly-section">
               <div class="weekly-header">
-                <span>Weekly</span>
-                <span>${weekUsed.toLocaleString()} / ${weekLimit.toLocaleString()}</span>
+                <span>Weekly${weekDaysLeft !== null ? ' · ' + weekDaysLeft + 'd left' : ''}</span>
+                <span>${weekUsed.toLocaleString()} / ${weekLimit.toLocaleString()} · ${weekPercent.toFixed(1)}%</span>
               </div>
               <div class="weekly-bar">
                 <div class="weekly-fill" style="width: ${Math.min(weekPercent, 100)}%"></div>
+              </div>
+              <div class="weekly-stats">
+                <span>${formatRate(weekRateOfUse, weekRateOfUseAbs)} ${rateLabel()}</span>
+                <span>max ${formatRate(weekMaxRateOfUse, weekMaxRateOfUseAbs)} ${rateLabel()}</span>
               </div>
             </div>
           </div>
