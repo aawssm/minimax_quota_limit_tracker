@@ -1,0 +1,1375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Model Quota Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/luxon@3.4.4/build/global/luxon.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --primary: #6366f1;
+      --primary-dark: #4f46e5;
+      --primary-light: #818cf8;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --bg: #f0f4f8;
+      --card-bg: #ffffff;
+      --text: #1e293b;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f172a;
+        --card-bg: #1e293b;
+        --text: #f1f5f9;
+        --text-muted: #94a3b8;
+        --border: #334155;
+      }
+    }
+
+    [data-theme="dark"] {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --border: #334155;
+    }
+
+    [data-theme="light"] {
+      --bg: #f0f4f8;
+      --card-bg: #ffffff;
+      --text: #1e293b;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 30px 10vw;
+    }
+
+    .container {
+      max-width: 80vw;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+
+    .header h1 {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .header h1::before {
+      content: '';
+      display: inline-block;
+      width: 8px;
+      height: 28px;
+      background: linear-gradient(180deg, var(--primary) 0%, var(--primary-dark) 100%);
+      border-radius: 4px;
+    }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--card-bg);
+      padding: 10px 16px;
+      border-radius: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+
+    .controls label {
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+
+    .controls input {
+      width: 55px;
+      padding: 6px 10px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 14px;
+      text-align: center;
+    }
+
+    .controls input:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+    }
+
+    .btn {
+      padding: 8px 16px;
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn:hover {
+      background: var(--primary-dark);
+      transform: translateY(-1px);
+    }
+
+    .btn:active {
+      transform: translateY(0);
+    }
+
+    /* Error */
+    .error {
+      background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+      color: #dc2626;
+      padding: 16px 20px;
+      border-radius: 12px;
+      margin-bottom: 24px;
+      display: none;
+      border-left: 4px solid var(--danger);
+    }
+
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      min-width: 10px;
+      min-height: 10px;
+      border-radius: 50%;
+      background: var(--success);
+    }
+
+    .status-dot.loading {
+      background: var(--warning);
+    }
+
+    .status-dot.ready {
+      background: var(--success);
+    }
+
+    /* Cards Grid */
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 20px;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -1px rgba(0,0,0,0.04);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -2px rgba(0,0,0,0.04);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 20px;
+    }
+
+    .model-name {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 200px;
+      position: relative;
+      cursor: default;
+    }
+
+    .model-name:hover {
+      white-space: normal;
+      overflow: visible;
+      text-overflow: unset;
+      max-width: none;
+      word-break: break-word;
+      z-index: 10;
+      background: var(--card-bg);
+    }
+
+    .model-name span {
+      display: block;
+      font-size: 12px;
+      font-weight: 400;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .quota-badge {
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .quota-badge.high {
+      background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+      color: #065f46;
+    }
+
+    .quota-badge.medium {
+      background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+      color: #92400e;
+    }
+
+    .quota-badge.low {
+      background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+      color: #991b1b;
+    }
+
+    /* Usage Section */
+    .usage-section {
+      margin-bottom: 16px;
+    }
+
+    .usage-label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .usage-label span:first-child {
+      font-size: 13px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .usage-label span:last-child {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .progress-bar {
+      height: 10px;
+      background: #e2e8f0;
+      border-radius: 5px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      border-radius: 5px;
+      transition: width 0.6s ease-out;
+    }
+
+    .progress-fill.good {
+      background: linear-gradient(90deg, var(--success), #34d399);
+    }
+
+    .progress-fill.warning {
+      background: linear-gradient(90deg, var(--warning), #fbbf24);
+    }
+
+    .progress-fill.danger {
+      background: linear-gradient(90deg, var(--danger), #f87171);
+    }
+
+    /* Stats Row */
+    .stats-row {
+      display: flex;
+      justify-content: space-between;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+      margin-top: 16px;
+    }
+
+    .stat {
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .stat-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-top: 4px;
+    }
+
+    /* Weekly Mini Bar */
+    .weekly-section {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px dashed var(--border);
+    }
+
+    .weekly-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+
+    .weekly-header span {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .weekly-bar {
+      height: 4px;
+      background: #f1f5f9;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .weekly-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--primary-light), var(--primary));
+      border-radius: 2px;
+      transition: width 0.4s ease-out;
+    }
+
+    /* Footer */
+    .footer {
+      text-align: center;
+      margin-top: 30px;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    /* Loading State */
+    .loading {
+      text-align: center;
+      padding: 0;
+    }
+
+    .loading-spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid var(--border);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 16px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .loading p {
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+
+    /* Empty State */
+    .empty {
+      text-align: center;
+      padding: 60px 20px;
+      background: var(--card-bg);
+      border-radius: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+
+    .empty-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+    }
+
+    .empty h3 {
+      color: var(--text);
+      margin-bottom: 8px;
+    }
+
+    .empty p {
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+
+    /* Unavailable Section */
+    .unavailable-section {
+      margin-top: 30px;
+    }
+
+    .unavailable-toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 16px;
+      cursor: pointer;
+      font-size: 14px;
+      color: var(--text-muted);
+      width: 100%;
+      text-align: left;
+      transition: all 0.2s;
+    }
+
+    .unavailable-toggle:hover {
+      border-color: var(--primary);
+      color: var(--text);
+    }
+
+    .unavailable-toggle .arrow {
+      transition: transform 0.2s;
+      font-size: 12px;
+    }
+
+    .unavailable-toggle.open .arrow {
+      transform: rotate(90deg);
+    }
+
+    .unavailable-toggle .count {
+      background: var(--border);
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 12px;
+      margin-left: auto;
+    }
+
+    .unavailable-models {
+      display: none;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 20px;
+      margin-top: 16px;
+    }
+
+    .unavailable-models.show {
+      display: grid;
+    }
+
+    .card.unavailable {
+      opacity: 0.6;
+      background: var(--card-bg);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+    }
+
+    .card.unavailable:hover {
+      transform: none;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+      opacity: 0.8;
+    }
+
+    .unavailable-badge {
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      background: var(--border);
+      color: var(--text-muted);
+    }
+
+    /* Card visibility toggle */
+    .card-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .visibility-toggle {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 16px;
+      padding: 4px;
+      border-radius: 6px;
+      opacity: 0.6;
+      transition: all 0.2s;
+      color: var(--text);
+    }
+
+    .visibility-toggle:hover {
+      opacity: 1;
+      background: var(--border);
+    }
+
+    .card.hidden-card {
+      opacity: 0.4;
+    }
+
+    .card.hidden-card .progress-fill {
+      background: var(--border) !important;
+    }
+
+    /* Chart Section */
+    .chart-section {
+      margin-bottom: 24px;
+    }
+
+    .chart-card {
+      background: var(--card-bg);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -1px rgba(0,0,0,0.04);
+    }
+
+    .chart-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .chart-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .time-range-buttons {
+      display: flex;
+      gap: 8px;
+    }
+
+    .time-range-btn {
+      padding: 6px 14px;
+      border: 1px solid var(--border);
+      background: var(--card-bg);
+      color: var(--text-muted);
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .time-range-btn:hover {
+      border-color: var(--primary);
+      color: var(--primary);
+    }
+
+    .time-range-btn.active {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: white;
+    }
+
+    .chart-container {
+      position: relative;
+      height: 300px;
+    }
+
+    .chart-no-data {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 300px;
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+    @media (max-width: 768px) {
+      body {
+        padding: 16px 5vw;
+      }
+
+      .header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+      }
+
+      .header h1 {
+        font-size: 22px;
+      }
+
+      .controls {
+        flex-wrap: wrap;
+        padding: 10px 12px;
+        gap: 8px;
+      }
+
+      .controls label {
+        display: none;
+      }
+
+      .controls input {
+        width: 60px;
+      }
+
+      .btn {
+        padding: 8px 12px;
+      }
+
+      .cards {
+        grid-template-columns: 1fr;
+        gap: 12px;
+      }
+
+      .unavailable-models {
+        grid-template-columns: 1fr;
+        gap: 12px;
+      }
+
+      .card {
+        padding: 16px;
+      }
+
+      .model-name {
+        max-width: 160px;
+        font-size: 16px;
+      }
+
+      .stats-row {
+        gap: 8px;
+      }
+
+      .stat-value {
+        font-size: 14px;
+      }
+
+      .stat-label {
+        font-size: 10px;
+      }
+    }
+
+    @media (min-width: 769px) and (max-width: 1024px) {
+      .cards {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .unavailable-models {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Model Quota Dashboard</h1>
+      <div class="controls">
+        <div class="status">
+          <div class="status-dot" id="statusDot"></div>
+          <span id="statusText">Ready</span>
+        </div>
+        <label>Auto-refresh:</label>
+        <input type="number" id="refreshInterval" value="5" min="1" max="60">
+        <span>min</span>
+        <button class="btn" id="refreshBtn">Refresh</button>
+        <button class="btn" id="themeBtn" style="padding: 6px 10px; font-size: 16px;">&#9788;</button>
+        <button class="btn" id="rateToggleBtn" title="Toggle rate display" style="padding: 6px 10px; font-size: 12px; min-width: 70px;">% / hr</button>
+      </div>
+    </div>
+
+    <div id="error" class="error"></div>
+
+    <div id="chartSection" class="chart-section" style="display: none;">
+      <div class="chart-card">
+        <div class="chart-header">
+          <div class="chart-title">Usage Over Time</div>
+          <div class="time-range-buttons">
+            <button class="time-range-btn active" data-hours="8">8 hours</button>
+            <button class="time-range-btn" data-hours="24">24 hours</button>
+            <button class="time-range-btn" data-hours="168">7 days</button>
+            <button class="time-range-btn" data-hours="720">30 days</button>
+          </div>
+        </div>
+        <div class="chart-container">
+          <canvas id="usageChart"></canvas>
+          <div id="chartNoData" class="chart-no-data" style="display: none;">No history data available yet</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="loading" class="loading" style="display: none;">
+      <div class="loading-spinner"></div>
+      <p>Loading quota data...</p>
+    </div>
+
+    <div id="cards" class="cards" style="display: none;"></div>
+    <div id="unavailableSection" class="unavailable-section" style="display: none;">
+      <button class="unavailable-toggle" id="unavailableToggle">
+        <span class="arrow">&#9654;</span>
+        <span>Unavailable Models</span>
+        <span class="count" id="unavailableCount">0</span>
+      </button>
+      <div id="unavailableModels" class="unavailable-models"></div>
+    </div>
+    <div id="empty" class="empty" style="display: none;">
+      <div class="empty-icon">📊</div>
+      <h3>No Quota Data</h3>
+      <p>No quota information available at the moment.</p>
+    </div>
+
+    <div class="footer" id="footer"></div>
+  </div>
+
+  <script>
+    const API_BASE = window.location.origin;
+    let refreshTimer = null;
+    let hiddenModels = new Set();
+
+    // Dark mode
+    const themeBtn = document.getElementById('themeBtn');
+    const themes = ['system', 'light', 'dark'];
+    let themeIndex = 0;
+
+    // Rate display mode: 'percent' or 'absolute'
+    let rateMode = 'percent';
+    let cachedData = null;
+    const rateToggleBtn = document.getElementById('rateToggleBtn');
+    rateToggleBtn.addEventListener('click', () => {
+      rateMode = rateMode === 'percent' ? 'absolute' : 'percent';
+      rateToggleBtn.textContent = rateMode === 'percent' ? '% / hr' : 'req / hr';
+      if (cachedData) {
+        renderFromCache(cachedData);
+      }
+    });
+
+    function applyTheme(theme) {
+      if (theme === 'system') {
+        document.documentElement.removeAttribute('data-theme');
+      } else {
+        document.documentElement.setAttribute('data-theme', theme);
+      }
+      const icon = theme === 'dark' ? '&#9790;' : theme === 'light' ? '&#9788;' : '&#9788;';
+      themeBtn.innerHTML = icon;
+    }
+
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+      themeIndex = themes.indexOf(savedTheme);
+      if (themeIndex === -1) themeIndex = 0;
+    }
+    applyTheme(themes[themeIndex]);
+
+    themeBtn.addEventListener('click', () => {
+      themeIndex = (themeIndex + 1) % themes.length;
+      const current = themes[themeIndex];
+      localStorage.setItem('theme', current);
+      applyTheme(current);
+    });
+
+    async function fetchQuota() {
+      const errorEl = document.getElementById('error');
+      const loadingEl = document.getElementById('loading');
+      const cardsEl = document.getElementById('cards');
+      const emptyEl = document.getElementById('empty');
+      const footerEl = document.getElementById('footer');
+      const statusDot = document.getElementById('statusDot');
+      const statusText = document.getElementById('statusText');
+      statusDot.classList.add('loading');
+      statusText.textContent = 'Updating...';
+
+      try {
+        const res = await fetch(`${API_BASE}/api/quota`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+        const data = await res.json();
+        cachedData = data;
+        processAndRender(data);
+      } catch (err) {
+        errorEl.textContent = `Failed to fetch quota: ${err.message}`;
+        errorEl.style.display = 'block';
+        loadingEl.style.display = 'none';
+        statusText.textContent = 'Error';
+      } finally {
+        statusDot.classList.remove('loading');
+        statusDot.classList.add('ready');
+        statusText.textContent = 'Ready';
+      }
+    }
+
+    function processAndRender(data) {
+      const loadingEl = document.getElementById('loading');
+      const cardsEl = document.getElementById('cards');
+      const emptyEl = document.getElementById('empty');
+      const footerEl = document.getElementById('footer');
+
+      const models = data.model_remains || [];
+      if (models.length === 0) {
+        loadingEl.style.display = 'none';
+        emptyEl.style.display = 'block';
+      } else {
+        const available = models.filter(m => m.current_interval_total_count > 0);
+        const unavailable = models.filter(m => m.current_interval_total_count === 0);
+
+        if (available.length === 0 && unavailable.length > 0) {
+          emptyEl.querySelector('h3').textContent = 'No Usable Quota';
+          emptyEl.querySelector('p').textContent = 'All models have zero quota limit.';
+          emptyEl.style.display = 'block';
+          cardsEl.style.display = 'none';
+        } else if (available.length > 0) {
+          renderCards(available);
+          cardsEl.style.display = 'grid';
+          emptyEl.style.display = 'none';
+        }
+
+        if (unavailable.length > 0) {
+          renderUnavailableModels(unavailable);
+          document.getElementById('unavailableSection').style.display = 'block';
+          document.getElementById('unavailableCount').textContent = unavailable.length;
+        } else {
+          document.getElementById('unavailableSection').style.display = 'none';
+        }
+      }
+      footerEl.textContent = `Last updated: ${new Date().toLocaleString()}`;
+
+      // Also update the chart when quota data refreshes
+      if (typeof renderChart === 'function') {
+        renderChart();
+      }
+    }
+
+    function renderFromCache(data) {
+      const available = (data.model_remains || []).filter(m => m.current_interval_total_count > 0);
+      renderCards(available);
+    }
+
+    function renderCards(models) {
+      const cardsEl = document.getElementById('cards');
+
+      cardsEl.innerHTML = models.map(m => {
+        const remaining = m.current_interval_usage_count;
+        const limit = m.current_interval_total_count;
+        const used = Math.max(0, limit - remaining);
+        const percent = limit > 0 ? (used / limit) * 100 : 0;
+
+        let progressClass = 'good';
+        let badgeClass = 'high';
+        if (percent > 90) {
+          progressClass = 'danger';
+          badgeClass = 'low';
+        } else if (percent > 70) {
+          progressClass = 'warning';
+          badgeClass = 'medium';
+        }
+
+        const badgeText = percent > 90 ? 'Low' : percent > 70 ? 'Medium' : 'Good';
+
+        const weekRemaining = m.current_weekly_usage_count;
+        const weekLimit = m.current_weekly_total_count;
+        const weekUsed = Math.max(0, weekLimit - weekRemaining);
+        const weekPercent = weekLimit > 0 ? (weekUsed / weekLimit) * 100 : 0;
+
+        const resetIn = formatDuration(m.remains_time);
+
+        // Calculate interval duration from API times
+        const totalIntervalMs = m.end_time - m.start_time;
+        const intervalLabel = formatDurationShort(totalIntervalMs);
+        const elapsedMs = totalIntervalMs - m.remains_time;
+
+        // Rate calculations
+        const rateOfUse = elapsedMs > 0 ? (percent / (elapsedMs / 3600000)) : 0;
+        const maxRateOfUse = m.remains_time > 0 ? ((100 - percent) / (m.remains_time / 3600000)) : 0;
+
+        // Absolute rate (requests per hour)
+        const rateOfUseAbs = elapsedMs > 0 ? (used / (elapsedMs / 3600000)) : 0;
+        const maxRateOfUseAbs = m.remains_time > 0 ? (remaining / (m.remains_time / 3600000)) : 0;
+
+        function formatRate(pctVal, absVal) {
+          if (rateMode === 'percent') {
+            return pctVal.toFixed(2);
+          } else {
+            return absVal < 1000 ? absVal.toFixed(1) : (absVal / 1000).toFixed(1) + 'k';
+          }
+        }
+
+        function rateLabel() {
+          return rateMode === 'percent' ? '% / hr' : 'req / hr';
+        }
+
+        const isHidden = hiddenModels.has(m.model_name);
+        return `
+          <div class="card ${isHidden ? 'hidden-card' : ''}" data-model-id="${escapeHtml(m.model_name)}">
+            <div class="card-header">
+              <div class="model-name">
+                ${escapeHtml(m.model_name)}
+                <span>Resets in ${resetIn}</span>
+              </div>
+              <div class="card-actions">
+                <button class="visibility-toggle" data-model-id="${escapeHtml(m.model_name)}" title="${isHidden ? 'Show' : 'Hide'}">
+                  ${isHidden ? '&#128764;' : '&#128065;'}
+                </button>
+                <div class="quota-badge ${badgeClass}">${badgeText}</div>
+              </div>
+            </div>
+
+            <div class="usage-section">
+              <div class="usage-label">
+                <span>${intervalLabel} Usage</span>
+                <span>${used.toLocaleString()} / ${limit.toLocaleString()}</span>
+              </div>
+              <div class="progress-bar">
+                <div class="progress-fill ${progressClass}" style="width: ${Math.min(percent, 100)}%"></div>
+              </div>
+            </div>
+
+            <div class="stats-row">
+              <div class="stat">
+                <div class="stat-value">${formatRate(rateOfUse, rateOfUseAbs)}</div>
+                <div class="stat-label">${rateLabel()}</div>
+              </div>
+              <div class="stat">
+                <div class="stat-value">${percent.toFixed(1)}%</div>
+                <div class="stat-label">Used</div>
+              </div>
+              <div class="stat">
+                <div class="stat-value">${formatRate(maxRateOfUse, maxRateOfUseAbs)}</div>
+                <div class="stat-label">max ${rateLabel()}</div>
+              </div>
+            </div>
+
+            <div class="weekly-section">
+              <div class="weekly-header">
+                <span>Weekly</span>
+                <span>${weekUsed.toLocaleString()} / ${weekLimit.toLocaleString()}</span>
+              </div>
+              <div class="weekly-bar">
+                <div class="weekly-fill" style="width: ${Math.min(weekPercent, 100)}%"></div>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+    }
+
+    // Event delegation for visibility toggles - handles dynamically created elements
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('.visibility-toggle');
+      if (!btn) return;
+
+      const modelName = btn.dataset.modelId;
+      if (hiddenModels.has(modelName)) {
+        hiddenModels.delete(modelName);
+      } else {
+        hiddenModels.add(modelName);
+      }
+      fetch(`${API_BASE}/api/preferences/hidden-models`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hiddenModels: Array.from(hiddenModels) })
+      }).catch(e => console.warn('Failed to save hidden models:', e));
+      // Re-render cards and chart
+      if (cachedData) {
+        const available = (cachedData.model_remains || []).filter(m => m.current_interval_total_count > 0);
+        renderCards(available);
+        if (typeof renderChart === 'function') {
+          renderChart();
+        }
+      }
+    });
+
+    function renderUnavailableModels(models) {
+      const container = document.getElementById('unavailableModels');
+      container.innerHTML = models.map(m => `
+        <div class="card unavailable">
+          <div class="card-header">
+            <div class="model-name">
+              ${escapeHtml(m.model_name)}
+              <span>Total limit: 0</span>
+            </div>
+            <div class="unavailable-badge">Unavailable</div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    document.getElementById('unavailableToggle').addEventListener('click', () => {
+      const toggle = document.getElementById('unavailableToggle');
+      const models = document.getElementById('unavailableModels');
+      toggle.classList.toggle('open');
+      models.classList.toggle('show');
+    });
+
+    function formatDuration(ms) {
+      if (!ms || ms <= 0) return 'N/A';
+      const hours = Math.floor(ms / 3600000);
+      const minutes = Math.floor((ms % 3600000) / 60000);
+      if (hours > 24) return `${Math.floor(hours / 24)}d ${hours % 24}h`;
+      return `${hours}h ${minutes}m`;
+    }
+
+    function formatDurationShort(ms) {
+      if (!ms || ms <= 0) return 'N/A';
+      const hours = Math.floor(ms / 3600000);
+      if (hours >= 24) return `${Math.floor(hours / 24)}d`;
+      return `${hours}hr`;
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    function startAutoRefresh() {
+      if (refreshTimer) clearInterval(refreshTimer);
+      const interval = parseInt(document.getElementById('refreshInterval').value) || 5;
+      refreshTimer = setInterval(fetchQuota, interval * 60 * 1000);
+    }
+
+    document.getElementById('refreshBtn').addEventListener('click', fetchQuota);
+    document.getElementById('refreshInterval').addEventListener('change', startAutoRefresh);
+
+    async function loadHiddenModels() {
+      try {
+        const res = await fetch(`${API_BASE}/api/preferences/hidden-models`);
+        if (res.ok) {
+          const data = await res.json();
+          hiddenModels = new Set(data);
+        }
+      } catch (e) {
+        console.warn('Failed to load hidden models preference:', e);
+      }
+    }
+
+    loadHiddenModels().then(() => {
+      fetchQuota();
+      startAutoRefresh();
+    });
+
+    // Chart.js related code
+    let usageChart = null;
+    let currentTimeRange = 8;
+    let chartModels = [];
+
+    // Color palette - at least 10 distinct colors
+    const colorPalette = [
+      '#6366f1', // indigo
+      '#10b981', // emerald
+      '#f59e0b', // amber
+      '#ef4444', // red
+      '#8b5cf6', // violet
+      '#06b6d4', // cyan
+      '#f97316', // orange
+      '#ec4899', // pink
+      '#14b8a6', // teal
+      '#84cc16', // lime
+      '#a855f7', // purple
+      '#3b82f6', // blue
+    ];
+
+    function getModelColor(index) {
+      return colorPalette[index % colorPalette.length];
+    }
+
+    async function fetchChartData(hours) {
+      try {
+        const [historyRes, modelsRes] = await Promise.all([
+          fetch(`${API_BASE}/api/history?hours=${hours}`),
+          fetch(`${API_BASE}/api/models-with-limits`)
+        ]);
+
+        if (!historyRes.ok) throw new Error(`History API ${historyRes.status}`);
+        if (!modelsRes.ok) throw new Error(`Models API ${modelsRes.status}`);
+
+        const history = await historyRes.json();
+        const models = await modelsRes.json();
+
+        return { history, models };
+      } catch (err) {
+        console.error('Failed to fetch chart data:', err);
+        return { history: [], models: [] };
+      }
+    }
+
+    function formatTimeLabel(timestamp, range) {
+      const date = new Date(timestamp);
+      if (range <= 24) {
+        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      } else if (range <= 168) {
+        return date.toLocaleDateString([], { weekday: 'short', hour: '2-digit' });
+      } else {
+        return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+      }
+    }
+
+    function buildChartDatasets(historyData, modelsWithLimits) {
+      if (!modelsWithLimits || modelsWithLimits.length === 0) return [];
+
+      // Group history by model_name (consistent with hiddenModels which uses model_name)
+      const modelHistory = {};
+      modelsWithLimits.forEach(m => {
+        modelHistory[m.model_name] = {
+          model_name: m.model_name,
+          limit: m.current_interval_total_count,
+          data: []
+        };
+      });
+
+      // Process history entries - use model_name from history entry
+      historyData.forEach(entry => {
+        if (modelHistory[entry.model_name]) {
+          const limit = modelHistory[entry.model_name].limit;
+          const used = entry.used_count || 0;
+          const percent = limit > 0 ? (used / limit) * 100 : 0;
+          modelHistory[entry.model_name].data.push({
+            x: entry.timestamp,
+            y: Math.min(percent, 100)
+          });
+        }
+      });
+
+      // Build datasets - filter out hidden models using model_name
+      let colorIndex = 0;
+      return modelsWithLimits
+        .filter(m => !hiddenModels.has(m.model_name))
+        .filter(m => modelHistory[m.model_name] && modelHistory[m.model_name].data.length > 0)
+        .map(m => {
+          const color = getModelColor(colorIndex++);
+          return {
+            label: m.model_name,
+            data: modelHistory[m.model_name].data,
+            borderColor: color,
+            backgroundColor: color + '20',
+            borderWidth: 2,
+            pointRadius: 0,
+            pointHoverRadius: 6,
+            pointHoverBackgroundColor: color,
+            pointHoverBorderColor: '#fff',
+            pointHoverBorderWidth: 2,
+            tension: 0.3,
+            fill: false,
+            _color: color,
+            _modelId: m.model_id
+          };
+        });
+    }
+
+    function getXAxisOptions(range) {
+      const tickFormat = (value) => {
+        const date = new Date(value);
+        if (range <= 24) {
+          return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        } else if (range <= 168) {
+          return date.toLocaleDateString([], { weekday: 'short', hour: '2-digit' });
+        } else {
+          return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+        }
+      };
+      if (range <= 24) {
+        return {
+          type: 'linear',
+          ticks: {
+            maxTicksLimit: 8,
+            callback: function(value) { return tickFormat(value); }
+          }
+        };
+      } else if (range <= 168) {
+        return {
+          type: 'linear',
+          ticks: {
+            maxTicksLimit: 7,
+            callback: function(value) { return tickFormat(value); }
+          }
+        };
+      } else {
+        return {
+          type: 'linear',
+          ticks: {
+            maxTicksLimit: 6,
+            callback: function(value) { return tickFormat(value); }
+          }
+        };
+      }
+    }
+
+    async function renderChart() {
+      const chartSection = document.getElementById('chartSection');
+      const chartNoData = document.getElementById('chartNoData');
+      const canvas = document.getElementById('usageChart');
+
+      const { history, models } = await fetchChartData(currentTimeRange);
+
+      if (!history || history.length === 0 || !models || models.length === 0) {
+        chartSection.style.display = 'block';
+        chartNoData.style.display = 'flex';
+        canvas.style.display = 'none';
+        return;
+      }
+
+      chartNoData.style.display = 'none';
+      canvas.style.display = 'block';
+      chartSection.style.display = 'block';
+
+      const datasets = buildChartDatasets(history, models);
+
+      if (datasets.length === 0) {
+        chartNoData.style.display = 'flex';
+        canvas.style.display = 'none';
+        return;
+      }
+
+      chartModels = datasets.map(d => ({ label: d.label, id: d._modelId }));
+
+      const existingChart = Chart.getChart(canvas);
+      if (existingChart) {
+        existingChart.destroy();
+      }
+
+      const ctx = canvas.getContext('2d');
+
+      usageChart = new Chart(ctx, {
+        type: 'line',
+        data: { datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: {
+            mode: 'index',
+            intersect: false
+          },
+          plugins: {
+            legend: {
+              display: true,
+              position: 'bottom',
+              labels: {
+                usePointStyle: true,
+                padding: 20,
+                font: { size: 12 }
+              }
+            },
+            tooltip: {
+              enabled: true,
+              callbacks: {
+                title: function(context) {
+                  if (context.length > 0) {
+                    const timestamp = context[0].parsed.x;
+                    const date = new Date(timestamp);
+                    if (currentTimeRange <= 24) {
+                      return date.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                    } else {
+                      return date.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                    }
+                  }
+                  return '';
+                },
+                label: function(context) {
+                  return `${context.dataset.label}: ${context.parsed.y.toFixed(2)}%`;
+                }
+              }
+            }
+          },
+          scales: {
+            x: getXAxisOptions(currentTimeRange),
+            y: {
+              min: 0,
+              max: 100,
+              title: {
+                display: true,
+                text: '% Used',
+                font: { size: 12 }
+              },
+              ticks: {
+                stepSize: 20,
+                callback: function(value) {
+                  return value + '%';
+                }
+              }
+            }
+          },
+          plugins: [{
+            id: 'hoverStyler',
+            afterEvent: (chart, args) => {
+              const { event } = args;
+              if (event.type === 'mousemove') {
+                const elements = chart.getElementsAtEventForMode(event, 'point', { intersect: true }, false);
+                if (elements.length === 0) {
+                  // Mouse is over chart area but not directly on a point - reset all lines and hide points
+                  chart.data.datasets.forEach(ds => {
+                    ds.borderColor = ds._color;
+                    ds.backgroundColor = ds._color + '20';
+                    ds.borderWidth = 2;
+                    ds.pointRadius = 0;
+                    ds.pointHoverRadius = 0;
+                  });
+                  chart.update('none');
+                }
+              }
+            }
+          }]
+        }
+      });
+
+      // Mouse leave handler to reset all lines to full opacity
+      canvas.addEventListener('mouseleave', () => {
+        const chart = Chart.getChart(canvas);
+        if (chart) {
+          chart.data.datasets.forEach(ds => {
+            ds.borderColor = ds._color;
+            ds.backgroundColor = ds._color + '20';
+            ds.borderWidth = 2;
+            ds.pointRadius = 0;
+            ds.pointHoverRadius = 0;
+          });
+          chart.update('none');
+        }
+      });
+
+      // Additional mousemove handler to detect when mouse is in chart area but not over a point
+      canvas.addEventListener('mousemove', (event) => {
+        const chart = Chart.getChart(canvas);
+        if (!chart) return;
+        const elements = chart.getElementsAtEventForMode(event, 'point', { intersect: true }, false);
+        if (elements.length === 0) {
+          // Mouse is in chart area but not directly over any point - reset all lines and hide points
+          chart.data.datasets.forEach(ds => {
+            ds.borderColor = ds._color;
+            ds.backgroundColor = ds._color + '20';
+            ds.borderWidth = 2;
+            ds.pointRadius = 0;
+            ds.pointHoverRadius = 0;
+          });
+          chart.update('none');
+        }
+      });
+    }
+
+    // Time range button handlers
+    document.querySelectorAll('.time-range-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.time-range-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentTimeRange = parseInt(btn.dataset.hours);
+        renderChart();
+      });
+    });
+
+    // Initial chart render after a short delay to allow quota data to load first
+    setTimeout(renderChart, 500);
+  </script>
+</body>
+</html>
