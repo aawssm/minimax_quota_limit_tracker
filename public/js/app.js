@@ -78,6 +78,15 @@ function processAndRender(data) {
   const emptyEl = document.getElementById('empty');
   const footerEl = document.getElementById('footer');
 
+  // Show/clear partial failure warnings
+  const errorEl = document.getElementById('error');
+  if (data._errors && data._errors.length > 0) {
+    errorEl.textContent = `Partial failure: ${data._errors.map(e => `${e.provider}: ${e.error}`).join('; ')}`;
+    errorEl.style.display = 'block';
+  } else {
+    errorEl.style.display = 'none';
+  }
+
   const models = data.model_remains || [];
   if (models.length === 0) {
     loadingEl.style.display = 'none';
@@ -190,6 +199,24 @@ function renderCards(models) {
     }
 
     const isHidden = hiddenModels.has(m.model_name);
+
+    const hasWeeklyData = weekLimit > 0;
+    const weeklySectionHtml = hasWeeklyData ? `
+        <div class="weekly-section">
+          <div class="weekly-header">
+            <span>Weekly${weekDaysLeft !== null ? ' · ' + weekDaysLeft + 'd left' : ''}</span>
+            <span>${weekUsed.toLocaleString()} / ${weekLimit.toLocaleString()} · ${weekPercent.toFixed(1)}%</span>
+          </div>
+          <div class="weekly-bar">
+            <div class="weekly-fill" style="width: ${Math.min(weekPercent, 100)}%"></div>
+          </div>
+          <div class="weekly-stats">
+            <span>${formatRate(weekRateOfUse, weekRateOfUseAbs)} ${rateLabel()}</span>
+            <span>max ${formatRate(weekMaxRateOfUse, weekMaxRateOfUseAbs)} ${rateLabel()}</span>
+          </div>
+        </div>
+      ` : '';
+
     return `
       <div class="card ${isHidden ? 'hidden-card' : ''}" data-model-id="${escapeHtml(m.model_name)}">
         <div class="card-header">
@@ -230,19 +257,7 @@ function renderCards(models) {
           </div>
         </div>
 
-        <div class="weekly-section">
-          <div class="weekly-header">
-            <span>Weekly${weekDaysLeft !== null ? ' · ' + weekDaysLeft + 'd left' : ''}</span>
-            <span>${weekUsed.toLocaleString()} / ${weekLimit.toLocaleString()} · ${weekPercent.toFixed(1)}%</span>
-          </div>
-          <div class="weekly-bar">
-            <div class="weekly-fill" style="width: ${Math.min(weekPercent, 100)}%"></div>
-          </div>
-          <div class="weekly-stats">
-            <span>${formatRate(weekRateOfUse, weekRateOfUseAbs)} ${rateLabel()}</span>
-            <span>max ${formatRate(weekMaxRateOfUse, weekMaxRateOfUseAbs)} ${rateLabel()}</span>
-          </div>
-        </div>
+        ${weeklySectionHtml}
       </div>
     `;
   }).join('');

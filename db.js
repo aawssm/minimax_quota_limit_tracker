@@ -29,6 +29,13 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_model_timestamp ON usage_history (model_name, timestamp)
 `);
 
+// Migration: add provider column if not exists
+try {
+  db.exec(`ALTER TABLE usage_history ADD COLUMN provider TEXT DEFAULT 'unknown'`);
+} catch {
+  // Column already exists
+}
+
 // Create preferences table
 db.exec(`
   CREATE TABLE IF NOT EXISTS preferences (
@@ -64,13 +71,13 @@ function hashString(str) {
   return Math.abs(hash).toString(36);
 }
 
-function insertUsageRecord(modelName, usageCount, limitCount, percentUsed) {
+function insertUsageRecord(modelName, usageCount, limitCount, percentUsed, provider = 'unknown') {
   const modelId = hashString(modelName);
   const stmt = db.prepare(`
-    INSERT INTO usage_history (model_name, model_id, timestamp, usage_count, limit_count, percent_used)
-    VALUES (?, ?, ?, ?, ?, ?)
+    INSERT INTO usage_history (model_name, model_id, timestamp, usage_count, limit_count, percent_used, provider)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
   `);
-  return stmt.run(modelName, modelId, Date.now(), usageCount, limitCount, percentUsed);
+  return stmt.run(modelName, modelId, Date.now(), usageCount, limitCount, percentUsed, provider);
 }
 
 function getUsageHistory(modelName, startTime, endTime) {
