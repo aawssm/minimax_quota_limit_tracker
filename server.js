@@ -29,7 +29,12 @@ const PORT = envVars.PORT || 3000;
 
 const app = express();
 
-app.use(express.static(__dirname));
+app.use(express.static(resolve(__dirname, 'public')));
+
+app.get('/api/version', (req, res) => {
+  const { version } = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf-8'));
+  res.json({ version });
+});
 
 app.get('/api/quota', async (req, res) => {
   if (!API_KEY) {

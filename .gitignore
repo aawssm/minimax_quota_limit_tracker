@@ -1,2 +1,36 @@
+# Dependencies
 node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db
+
 .env
+# Logs
+*.log
+log.txt
+
+# IDE
+.vscode/
+.idea/
+.history/
+
+# Local config (may contain tokens)
+.claude/
+.deepvcode/
+
+# Runtime data
+data/
+
+# Test artifacts
+tests/utils/*.png
+tests/utils/*.jpg
+tests/utils/*.jpeg
+
+# Environment
+.env
+.env.local
+
+# Build output
+dist/
+build/
