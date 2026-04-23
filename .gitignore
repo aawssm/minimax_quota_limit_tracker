@@ -1,6 +1,6 @@
 # Dependencies
 node_modules/
-
+*.tar
 # OS files
 .DS_Store
 Thumbs.db
